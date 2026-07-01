@@ -849,12 +849,44 @@ async function cargarViajesDelDia() {
   const lblTotal = document.getElementById('lbl-total-viajes-dia');
   const resumenDiv = document.getElementById('resumen-dia');
 
-  // Obtener viajes locales (pendientes + sincronizados) de la fecha
-  const todosViajes = await db.viajes_pendientes.toArray();
-  const viajesDelDia = todosViajes.filter(v => {
+  let viajesDelDia = [];
+
+  // 1. Traer viajes de Supabase para esta fecha (si hay conexión)
+  if (navigator.onLine && SESION.id_empresa) {
+    try {
+      const inicioFecha = `${fechaTrabajo}T00:00:00`;
+      const finFecha = `${fechaTrabajo}T23:59:59`;
+      const { data: viajesRemoto } = await supa.from('registro_viajes')
+        .select('*')
+        .eq('id_empresa', SESION.id_empresa)
+        .gte('fecha_viaje', inicioFecha)
+        .lte('fecha_viaje', finFecha)
+        .order('fecha_viaje', { ascending: true });
+
+      if (viajesRemoto && viajesRemoto.length > 0) {
+        viajesDelDia = viajesRemoto.map(v => ({
+          ...v,
+          id_local: null,
+          id_supabase: v.id,
+          sincronizado: 1
+        }));
+      }
+    } catch (err) {
+      console.warn("No se pudieron cargar viajes remotos:", err);
+    }
+  }
+
+  // 2. Agregar viajes locales pendientes (no sincronizados) de esta fecha
+  const viajesLocales = await db.viajes_pendientes.toArray();
+  const pendientesDelDia = viajesLocales.filter(v => {
     if (!v.fecha_viaje) return false;
-    return v.fecha_viaje.startsWith(fechaTrabajo);
+    return v.fecha_viaje.startsWith(fechaTrabajo) && !v.sincronizado;
   });
+
+  viajesDelDia = [...viajesDelDia, ...pendientesDelDia];
+
+  // Ordenar por fecha
+  viajesDelDia.sort((a, b) => new Date(a.fecha_viaje) - new Date(b.fecha_viaje));
 
   if (viajesDelDia.length === 0) {
     contenedor.innerHTML = '<p class="text-xs text-slate-500 italic text-center py-2">Sin viajes registrados este día</p>';
@@ -878,19 +910,23 @@ async function cargarViajesDelDia() {
     const hora = v.fecha_viaje ? new Date(v.fecha_viaje).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) : '--:--';
     const estadoSync = v.sincronizado ? '☁️' : '⏳';
 
-    totalVolumen += v.volumen_total || 0;
-    totalToneladas += v.toneladas_estimadas || 0;
+    totalVolumen += parseFloat(v.volumen_total) || 0;
+    totalToneladas += parseFloat(v.toneladas_estimadas) || 0;
 
     // Desglose subcomponente
-    const tieneDesglose = v.porcentaje_subcomponente > 0;
+    const porcentajeSub = parseFloat(v.porcentaje_subcomponente) || 0;
+    const tieneDesglose = porcentajeSub > 0;
     const desgloseHTML = tieneDesglose ? `
             <div class="flex items-center gap-3 mt-1">
               <span class="text-xs text-emerald-400">Grava: ${v.volumen_principal_neto} m³</span>
-              <span class="text-xs text-amber-400">Arena: ${v.volumen_subcomponente_neto} m³ (${v.porcentaje_subcomponente}%)</span>
+              <span class="text-xs text-amber-400">Arena: ${v.volumen_subcomponente_neto} m³ (${porcentajeSub}%)</span>
             </div>` : '';
 
-    const claseClick = 'cursor-pointer hover:border-blue-500/50';
-    const onClickViaje = `onclick="editarViaje(${v.id_local})"`;
+    // Solo editables los locales pendientes
+    const esLocal = v.id_local != null;
+    const claseClick = esLocal ? 'cursor-pointer hover:border-blue-500/50' : '';
+    const onClickViaje = esLocal ? `onclick="editarViaje(${v.id_local})"` : '';
+    const iconoEditar = esLocal ? '<span class="text-blue-400 text-xs">✏️</span>' : '';
 
     return `
       <div class="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50 transition ${claseClick}" ${onClickViaje}>
@@ -900,7 +936,7 @@ async function cargarViajesDelDia() {
               <span class="text-xs text-slate-500">${hora}</span>
               <span class="text-xs">${estadoSync}</span>
               <span class="text-xs font-medium text-slate-200">${equipo?.nombre_equipo || 'Equipo'} ${equipo?.placa_interno ? '(' + equipo.placa_interno + ')' : ''}</span>
-              <span class="text-blue-400 text-xs">✏️</span>
+              ${iconoEditar}
             </div>
             <div class="flex items-center gap-3 mt-1">
               <span class="text-xs text-slate-400">${mineral?.nombre_mineral || 'Material'}</span>
@@ -918,8 +954,8 @@ async function cargarViajesDelDia() {
   let totalGrava = 0;
   let totalArena = 0;
   viajesDelDia.forEach(v => {
-    totalGrava += v.volumen_principal_neto || 0;
-    totalArena += v.volumen_subcomponente_neto || 0;
+    totalGrava += parseFloat(v.volumen_principal_neto) || 0;
+    totalArena += parseFloat(v.volumen_subcomponente_neto) || 0;
   });
 
   // Resumen
