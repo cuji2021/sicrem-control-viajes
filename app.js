@@ -649,7 +649,8 @@ async function eliminarMineral(id) {
 // =========================================================================
 // 15. REGISTRO DE VIAJES
 // =========================================================================
-let editandoViajeId = null;
+let editandoViajeId = null;       // id_local para viajes en IndexedDB
+let editandoViajeRemotoId = null; // id de Supabase para viajes ya sincronizados
 
 formulario.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -697,16 +698,14 @@ formulario.addEventListener('submit', async (e) => {
 
   try {
     if (editandoViajeId) {
-      // MODO EDICIÓN
+      // MODO EDICIÓN LOCAL
       const viajeExistente = await db.viajes_pendientes.get(editandoViajeId);
       
       if (viajeExistente && viajeExistente.sincronizado && viajeExistente.id_supabase) {
-        // Ya está en Supabase → actualizar allá también
         datosViaje.sincronizado = 1;
         const { id_empresa, id_usuario, sincronizado, ...datosUpdate } = datosViaje;
         const { error } = await supa.from('registro_viajes').update(datosUpdate).eq('id', viajeExistente.id_supabase);
         if (error) {
-          // Si falla el update remoto, marcarlo como pendiente de re-sincronizar
           datosViaje.sincronizado = 0;
         }
       } else {
@@ -714,6 +713,16 @@ formulario.addEventListener('submit', async (e) => {
       }
 
       await db.viajes_pendientes.update(editandoViajeId, datosViaje);
+      mostrarAlerta("Registro actualizado correctamente.", "success");
+      resetearFormViaje();
+    } else if (editandoViajeRemotoId) {
+      // MODO EDICIÓN REMOTA (viaje que vino de Supabase)
+      const { id_empresa, id_usuario, sincronizado, ...datosUpdate } = datosViaje;
+      const { error } = await supa.from('registro_viajes').update(datosUpdate).eq('id', editandoViajeRemotoId);
+      if (error) {
+        mostrarAlerta("Error al actualizar: " + error.message, "error");
+        return;
+      }
       mostrarAlerta("Registro actualizado correctamente.", "success");
       resetearFormViaje();
     } else {
@@ -767,12 +776,53 @@ async function editarViaje(idLocal) {
 
 function resetearFormViaje() {
   editandoViajeId = null;
+  editandoViajeRemotoId = null;
   formulario.reset();
   txtVolumenTotal.value = "1";
   document.getElementById('seccion-subcomponente').classList.add('hidden');
   const btnSubmit = formulario.querySelector('button[type="submit"]');
   btnSubmit.innerHTML = "Guardar Registro";
   btnSubmit.className = "w-full bg-blue-600 hover:bg-blue-500 text-white font-bold p-3 rounded-lg transition shadow-lg flex justify-center items-center gap-2";
+}
+
+// Editar un viaje que ya está en Supabase (no en IndexedDB local)
+async function editarViajeRemoto(idSupabase) {
+  const { data: viaje, error } = await supa.from('registro_viajes')
+    .select('*')
+    .eq('id', idSupabase)
+    .single();
+
+  if (error || !viaje) {
+    mostrarAlerta("No se pudo cargar el viaje para editar.", "error");
+    return;
+  }
+
+  editandoViajeRemotoId = idSupabase;
+  editandoViajeId = null;
+
+  // Llenar formulario
+  selectEquipo.value = viaje.id_equipo;
+  selectMineral.value = viaje.id_mineral;
+  txtVolumenTotal.value = viaje.cantidad_conteo || 1;
+  txtObservaciones.value = viaje.observaciones || '';
+
+  // Subcomponente
+  const optMineral = selectMineral.selectedOptions[0];
+  if (optMineral && optMineral.getAttribute('data-subcomponente') === 'true') {
+    document.getElementById('seccion-subcomponente').classList.remove('hidden');
+    txtPorcentajeArena.value = viaje.porcentaje_subcomponente || 0;
+  } else {
+    document.getElementById('seccion-subcomponente').classList.add('hidden');
+  }
+
+  calcularDesglose();
+
+  // Cambiar botón
+  const btnSubmit = formulario.querySelector('button[type="submit"]');
+  btnSubmit.innerHTML = "Actualizar Registro";
+  btnSubmit.className = "w-full bg-amber-600 hover:bg-amber-500 text-white font-bold p-3 rounded-lg transition shadow-lg flex justify-center items-center gap-2";
+
+  formulario.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // =========================================================================
@@ -922,11 +972,13 @@ async function cargarViajesDelDia() {
               <span class="text-xs text-amber-400">Arena: ${v.volumen_subcomponente_neto} m³ (${porcentajeSub}%)</span>
             </div>` : '';
 
-    // Solo editables los locales pendientes
+    // Todos editables
     const esLocal = v.id_local != null;
-    const claseClick = esLocal ? 'cursor-pointer hover:border-blue-500/50' : '';
-    const onClickViaje = esLocal ? `onclick="editarViaje(${v.id_local})"` : '';
-    const iconoEditar = esLocal ? '<span class="text-blue-400 text-xs">✏️</span>' : '';
+    const claseClick = 'cursor-pointer hover:border-blue-500/50';
+    const onClickViaje = esLocal 
+      ? `onclick="editarViaje(${v.id_local})"` 
+      : `onclick="editarViajeRemoto('${v.id_supabase}')"`;
+    const iconoEditar = '<span class="text-blue-400 text-xs">✏️</span>';
 
     return `
       <div class="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50 transition ${claseClick}" ${onClickViaje}>
