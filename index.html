@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>SICREM - Control de Operación</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <style>
+      input, select, textarea, button { font-size: 16px !important; }
+      .fade-in { animation: fadeIn 0.3s ease-in; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+  </head>
+  <body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+
+    <!-- ============================================================ -->
+    <!-- PANTALLA: LOGIN / REGISTRO -->
+    <!-- ============================================================ -->
+    <section id="pantalla-auth" class="min-h-screen flex flex-col justify-center p-6 max-w-md mx-auto">
+      <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-blue-400">SICREM</h1>
+        <p class="text-slate-400 text-sm mt-1">Control de Operación y Material</p>
+      </div>
+
+      <!-- Tabs Login / Registro -->
+      <div class="flex bg-slate-800 rounded-lg p-1 mb-6">
+        <button id="tab-login" class="flex-1 py-2 text-sm font-semibold rounded-md bg-blue-600 text-white transition">Iniciar Sesión</button>
+        <button id="tab-registro" class="flex-1 py-2 text-sm font-semibold rounded-md text-slate-400 transition">Crear Cuenta</button>
+      </div>
+
+      <!-- Formulario Login -->
+      <form id="form-login" class="space-y-4">
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Correo electrónico</label>
+          <input type="email" id="login-email" placeholder="tu@correo.com"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-blue-500" required />
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Contraseña</label>
+          <input type="password" id="login-password" placeholder="••••••••"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-blue-500" required />
+        </div>
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold p-3 rounded-lg transition">
+          Entrar
+        </button>
+        <p id="login-error" class="text-rose-400 text-xs text-center hidden"></p>
+      </form>
+
+      <!-- Formulario Registro -->
+      <form id="form-registro" class="space-y-4 hidden">
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Nombre de la Empresa</label>
+          <input type="text" id="reg-empresa" placeholder="Ej: Agregados del Valle S.A."
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-blue-500" required />
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">NIT / Identificación</label>
+          <input type="text" id="reg-nit" placeholder="Ej: 900.123.456-7"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-blue-500" />
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Tu nombre</label>
+          <input type="text" id="reg-nombre" placeholder="Nombre completo"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-blue-500" required />
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Correo electrónico</label>
+          <input type="email" id="reg-email" placeholder="tu@correo.com"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-blue-500" required />
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Contraseña (mín. 6 caracteres)</label>
+          <div class="relative">
+            <input type="password" id="reg-password" placeholder="••••••••" minlength="6"
+              class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 pr-12 text-slate-200 focus:outline-none focus:border-blue-500" required />
+            <button type="button" id="btn-ver-password"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 text-sm"
+              aria-label="Mostrar contraseña">
+              👁️
+            </button>
+          </div>
+        </div>
+        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold p-3 rounded-lg transition">
+          Crear Cuenta y Empresa
+        </button>
+        <p id="registro-error" class="text-rose-400 text-xs text-center hidden"></p>
+        <p id="registro-ok" class="text-emerald-400 text-xs text-center hidden"></p>
+      </form>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- PANTALLA: APP PRINCIPAL (oculta hasta login) -->
+    <!-- ============================================================ -->
+    <section id="pantalla-app" class="hidden">
+      <header class="bg-slate-800 p-4 shadow-lg border-b border-slate-700 flex justify-between items-center">
+        <div>
+          <h1 class="text-xl font-bold tracking-wide text-blue-400">SICREM</h1>
+          <p id="lbl-empresa" class="text-xs text-slate-400">Registro de Material</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div id="connection-status"
+            class="flex items-center gap-2 bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full text-xs font-semibold border border-emerald-500/20">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            En Línea
+          </div>
+          <button id="btn-logout" class="text-slate-400 hover:text-rose-400 text-xs font-medium">Salir</button>
+        </div>
+      </header>
+
+      <!-- Barra de Fecha de Trabajo -->
+      <div class="bg-slate-800/50 border-b border-slate-700 px-4 py-2 flex items-center justify-between">
+        <div class="flex items-center gap-2 text-sm">
+          <span class="text-slate-400">📅 Fecha de trabajo:</span>
+          <span id="lbl-fecha-trabajo" class="text-blue-400 font-semibold"></span>
+        </div>
+        <input type="date" id="input-fecha-trabajo"
+          class="bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500" />
+      </div>
+
+      <nav class="bg-slate-800 border-b border-slate-700 flex justify-around text-sm font-medium text-slate-400">
+        <button id="btn-nav-registro" class="py-3 px-2 text-blue-400 border-b-2 border-blue-400 w-full text-center">
+          Registro
+        </button>
+        <button id="btn-nav-catalogos" class="py-3 px-2 w-full text-center hover:text-slate-200">
+          Parámetros
+        </button>
+        <button id="btn-nav-reportes" class="py-3 px-2 w-full text-center hover:text-slate-200">
+          Reportes
+        </button>
+      </nav>
+
+      <main class="p-4 max-w-md mx-auto space-y-6">
+        <!-- VISTA: REGISTRO DE VIAJES -->
+        <section id="vista-registro" class="space-y-4 fade-in">
+          <div class="bg-slate-800 p-5 rounded-xl shadow-xl border border-slate-700 space-y-4">
+            <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">
+              Registrar Salida de Material
+            </h2>
+
+            <form id="viaje-form" class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-slate-400 mb-1">Equipo que Carga</label>
+                <select id="select-equipo"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none" required>
+                  <option value="">Cargando equipos...</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-slate-400 mb-1">Material Extraído</label>
+                <select id="select-mineral"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none" required>
+                  <option value="">Cargando materiales...</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-slate-400 mb-1">Cantidad (Viajes / Baldados / Paladas)</label>
+                <input type="number" id="volumen-total" step="0.01" value="1"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none" required />
+              </div>
+
+              <div id="seccion-subcomponente" class="hidden bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 space-y-3">
+                <div>
+                  <label class="block text-sm font-medium text-slate-400 mb-1">Porcentaje de Arena (%)</label>
+                  <input type="number" id="porcentaje-arena" step="0.1" placeholder="Ej: 15"
+                    class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none" />
+                </div>
+                <div class="text-xs text-slate-400 flex justify-between px-1">
+                  <span>Arena estimada: <strong id="preview-arena" class="text-blue-400">0.00</strong> m³</span>
+                  <span>Grava neta: <strong id="preview-grava" class="text-blue-400">0.00</strong> m³</span>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-slate-400 mb-1">Observaciones</label>
+                <textarea id="observaciones" rows="2" placeholder="Opcional..."
+                  class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none"></textarea>
+              </div>
+
+              <button type="submit"
+                class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold p-3 rounded-lg transition shadow-lg flex justify-center items-center gap-2">
+                Guardar Registro
+              </button>
+            </form>
+          </div>
+
+          <div class="text-center text-xs text-slate-500">
+            Registros pendientes por sincronizar:
+            <span id="pendientes-count" class="font-bold text-amber-400">0</span>
+          </div>
+
+          <!-- LISTA DE VIAJES DEL DÍA -->
+          <div class="bg-slate-800 p-4 rounded-xl shadow-xl border border-slate-700 space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-2">
+              <h3 class="text-sm font-semibold text-slate-200">Viajes del día</h3>
+              <span id="lbl-total-viajes-dia" class="text-xs text-blue-400 font-semibold">0 registros</span>
+            </div>
+            <div id="lista-viajes-dia" class="space-y-2 max-h-64 overflow-y-auto">
+              <p class="text-xs text-slate-500 italic text-center py-2">Sin viajes registrados hoy</p>
+            </div>
+            <div id="resumen-dia" class="hidden border-t border-slate-700 pt-2 space-y-1">
+              <div class="flex justify-between text-xs text-slate-400">
+                <span>Vol. total:</span>
+                <span id="resumen-volumen" class="text-slate-200 font-semibold">0 m³</span>
+              </div>
+              <div id="resumen-desglose"></div>
+              <div class="flex justify-between text-xs text-slate-400">
+                <span>Ton. estimadas:</span>
+                <span id="resumen-toneladas" class="text-slate-200 font-semibold">0 Ton</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VISTA: PARÁMETROS / CATÁLOGOS -->
+        <section id="vista-catalogos" class="hidden space-y-6 fade-in">
+          <div class="bg-slate-800 p-5 rounded-xl shadow-xl border border-slate-700 space-y-3">
+            <h3 class="text-md font-semibold text-slate-200 border-b border-slate-700 pb-1">➕ Agregar Equipo de Carga</h3>
+            <form id="form-catalogo-equipo" class="space-y-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Nombre del Equipo</label>
+                <input type="text" id="cat-equipo-nombre" placeholder="Ej: Retroexcavadora CAT 320"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 focus:outline-none" required />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Código Interno / Placa</label>
+                <input type="text" id="cat-equipo-placa" placeholder="Ej: RETRO-01"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 focus:outline-none" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Capacidad del Platón / Cucharón (m³)</label>
+                <input type="number" id="cat-equipo-capacidad" step="0.01" placeholder="Ej: 14.0 o 2.5"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 focus:outline-none" required />
+              </div>
+              <button type="submit"
+                class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold p-2 rounded-lg transition">
+                Guardar Equipo
+              </button>
+            </form>
+            <!-- Lista de equipos existentes -->
+            <div class="border-t border-slate-700 pt-3 mt-3">
+              <h4 class="text-xs font-semibold text-slate-400 mb-2">Equipos registrados:</h4>
+              <div id="lista-equipos" class="space-y-2 max-h-48 overflow-y-auto">
+                <p class="text-xs text-slate-500 italic">Sin equipos aún</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-slate-800 p-5 rounded-xl shadow-xl border border-slate-700 space-y-3">
+            <h3 class="text-md font-semibold text-slate-200 border-b border-slate-700 pb-1">➕ Agregar Mineral / Material</h3>
+            <form id="form-catalogo-mineral" class="space-y-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Nombre del Mineral</label>
+                <input type="text" id="cat-mineral-nombre" placeholder="Ej: Grava de Río"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 focus:outline-none" required />
+              </div>
+              <div class="flex items-center gap-2 py-1">
+                <input type="checkbox" id="cat-mineral-sub" class="w-4 h-4 text-blue-600 bg-slate-900 border-slate-700 rounded" />
+                <label for="cat-mineral-sub" class="text-xs font-medium text-slate-400">¿Requiere segregar subcomponente (Arena)?</label>
+              </div>
+              <div id="seccion-nombre-sub" class="hidden space-y-3">
+                <div>
+                  <label class="block text-xs font-medium text-slate-400 mb-1">Nombre del Subcomponente</label>
+                  <input type="text" id="cat-mineral-nombre-sub" value="Arena de Río"
+                    class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 focus:outline-none" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-400 mb-1">% de Subcomponente por Defecto</label>
+                  <input type="number" id="cat-mineral-porcentaje-defecto" step="0.1" placeholder="Ej: 15" value="0"
+                    class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 focus:outline-none" />
+                  <p class="text-xs text-slate-500 mt-1">Se precargará en cada registro. El operador puede ajustarlo.</p>
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Densidad Promedio (Ton/m³)</label>
+                <input type="number" id="cat-mineral-densidad" step="0.01" placeholder="Ej: 1.60"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 focus:outline-none" required />
+              </div>
+              <button type="submit"
+                class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold p-2 rounded-lg transition">
+                Guardar Mineral
+              </button>
+            </form>
+            <!-- Lista de minerales existentes -->
+            <div class="border-t border-slate-700 pt-3 mt-3">
+              <h4 class="text-xs font-semibold text-slate-400 mb-2">Minerales registrados:</h4>
+              <div id="lista-minerales" class="space-y-2 max-h-48 overflow-y-auto">
+                <p class="text-xs text-slate-500 italic">Sin minerales aún</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VISTA: REPORTES -->
+        <section id="vista-reportes" class="hidden space-y-4 fade-in">
+          <div class="bg-slate-800 p-5 rounded-xl shadow-xl border border-slate-700 space-y-4">
+            <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">
+              Exportar a Excel
+            </h2>
+
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Desde</label>
+                <input type="date" id="reporte-fecha-desde"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Hasta</label>
+                <input type="date" id="reporte-fecha-hasta"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none" />
+              </div>
+            </div>
+
+            <button onclick="exportarExcel()"
+              class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold p-3 rounded-lg transition shadow-lg flex justify-center items-center gap-2">
+              📥 Descargar Excel
+            </button>
+
+            <p class="text-xs text-slate-500 text-center">Exporta todos los viajes registrados en el rango de fechas seleccionado.</p>
+          </div>
+        </section>
+      </main>
+    </section>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="app.js"></script>
+
+    <!-- MODAL DE ALERTA CON ESTILO -->
+    <div id="modal-alerta" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-black/60" onclick="cerrarAlerta()"></div>
+      <div class="relative bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-sm shadow-2xl fade-in">
+        <div id="modal-icono" class="text-3xl text-center mb-3"></div>
+        <p id="modal-mensaje" class="text-sm text-slate-200 text-center mb-5"></p>
+        <button onclick="cerrarAlerta()"
+          class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-lg transition text-sm">
+          Aceptar
+        </button>
+      </div>
+    </div>
+
+    <!-- MODAL DE CONFIRMACIÓN -->
+    <div id="modal-confirmar" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-black/60"></div>
+      <div class="relative bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-sm shadow-2xl fade-in">
+        <div class="text-3xl text-center mb-3">⚠️</div>
+        <p id="confirmar-mensaje" class="text-sm text-slate-200 text-center mb-5"></p>
+        <div class="flex gap-3">
+          <button id="btn-confirmar-no" onclick="resolverConfirmacion(false)"
+            class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold py-2.5 rounded-lg transition text-sm">
+            Cancelar
+          </button>
+          <button id="btn-confirmar-si" onclick="resolverConfirmacion(true)"
+            class="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-bold py-2.5 rounded-lg transition text-sm">
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
