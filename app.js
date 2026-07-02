@@ -952,8 +952,10 @@ async function cargarViajesDelDia() {
   // 2. Agregar viajes locales pendientes (no sincronizados) de esta fecha
   const viajesLocales = await db.viajes_pendientes.toArray();
   const pendientesDelDia = viajesLocales.filter(v => {
-    if (!v.fecha_viaje) return false;
-    return v.fecha_viaje.startsWith(fechaTrabajo) && !v.sincronizado;
+    if (!v.fecha_viaje || v.sincronizado) return false;
+    // Convertir la fecha guardada a fecha en Bogotá para comparar
+    const fechaEnBogota = new Intl.DateTimeFormat('en-CA', { timeZone: ZONA_HORARIA }).format(new Date(v.fecha_viaje));
+    return fechaEnBogota === fechaTrabajo;
   });
 
   viajesDelDia = [...viajesDelDia, ...pendientesDelDia];
@@ -1071,7 +1073,7 @@ async function exportarExcel() {
   const todosViajes = await db.viajes_pendientes.toArray();
   const viajesFiltrados = todosViajes.filter(v => {
     if (!v.fecha_viaje) return false;
-    const fechaViaje = v.fecha_viaje.split('T')[0];
+    const fechaViaje = new Intl.DateTimeFormat('en-CA', { timeZone: ZONA_HORARIA }).format(new Date(v.fecha_viaje));
     return fechaViaje >= desde && fechaViaje <= hasta;
   });
 
