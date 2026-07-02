@@ -53,6 +53,55 @@
           Entrar
         </button>
         <p id="login-error" class="text-rose-400 text-xs text-center hidden"></p>
+        <p class="text-center">
+          <button type="button" id="btn-olvide-password" class="text-blue-400 text-xs hover:underline">¿Olvidaste tu contraseña?</button>
+        </p>
+      </form>
+
+      <!-- Formulario Recuperar Contraseña -->
+      <form id="form-recuperar" class="space-y-4 hidden">
+        <p class="text-sm text-slate-400 text-center">Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.</p>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Correo electrónico</label>
+          <input type="email" id="recuperar-email" placeholder="tu@correo.com"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-blue-500" required />
+        </div>
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold p-3 rounded-lg transition">
+          Enviar Enlace
+        </button>
+        <p id="recuperar-error" class="text-rose-400 text-xs text-center hidden"></p>
+        <p id="recuperar-ok" class="text-emerald-400 text-xs text-center hidden"></p>
+        <p class="text-center">
+          <button type="button" id="btn-volver-login" class="text-slate-400 text-xs hover:underline">← Volver al login</button>
+        </p>
+      </form>
+
+      <!-- Formulario Nueva Contraseña (se muestra cuando viene del enlace de recuperación) -->
+      <form id="form-nueva-password" class="space-y-4 hidden">
+        <h2 class="text-lg font-semibold text-slate-200 text-center">Nueva Contraseña</h2>
+        <p class="text-sm text-slate-400 text-center">Ingresa tu nueva contraseña.</p>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Nueva contraseña (mín. 6 caracteres)</label>
+          <div class="relative">
+            <input type="password" id="nueva-password" placeholder="••••••••" minlength="6"
+              class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 pr-12 text-slate-200 focus:outline-none focus:border-blue-500" required />
+            <button type="button" id="btn-ver-nueva-password"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 text-sm"
+              aria-label="Mostrar contraseña">
+              👁️
+            </button>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Confirmar contraseña</label>
+          <input type="password" id="confirmar-nueva-password" placeholder="••••••••" minlength="6"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-blue-500" required />
+        </div>
+        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold p-3 rounded-lg transition">
+          Guardar Nueva Contraseña
+        </button>
+        <p id="nueva-password-error" class="text-rose-400 text-xs text-center hidden"></p>
+        <p id="nueva-password-ok" class="text-emerald-400 text-xs text-center hidden"></p>
       </form>
 
       <!-- Formulario Registro -->

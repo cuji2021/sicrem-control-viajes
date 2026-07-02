@@ -127,6 +127,96 @@ document.getElementById('btn-ver-password-login').addEventListener('click', () =
   }
 });
 
+// Toggle ver/ocultar nueva contraseña
+document.getElementById('btn-ver-nueva-password').addEventListener('click', () => {
+  const input = document.getElementById('nueva-password');
+  const btn = document.getElementById('btn-ver-nueva-password');
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁️';
+  }
+});
+
+// =========================================================================
+// 5b. RECUPERAR CONTRASEÑA
+// =========================================================================
+const formRecuperar = document.getElementById('form-recuperar');
+const formNuevaPassword = document.getElementById('form-nueva-password');
+
+// Mostrar formulario de recuperación
+document.getElementById('btn-olvide-password').addEventListener('click', () => {
+  formLogin.classList.add('hidden');
+  formRegistro.classList.add('hidden');
+  formRecuperar.classList.remove('hidden');
+  document.querySelector('#pantalla-auth .flex.bg-slate-800').classList.add('hidden'); // ocultar tabs
+});
+
+// Volver al login
+document.getElementById('btn-volver-login').addEventListener('click', () => {
+  formRecuperar.classList.add('hidden');
+  formLogin.classList.remove('hidden');
+  document.querySelector('#pantalla-auth .flex.bg-slate-800').classList.remove('hidden');
+});
+
+// Enviar enlace de recuperación
+formRecuperar.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('recuperar-email').value.trim();
+  const errorEl = document.getElementById('recuperar-error');
+  const okEl = document.getElementById('recuperar-ok');
+  errorEl.classList.add('hidden');
+  okEl.classList.add('hidden');
+
+  const { error } = await supa.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname
+  });
+
+  if (error) {
+    errorEl.textContent = "Error: " + error.message;
+    errorEl.classList.remove('hidden');
+  } else {
+    okEl.textContent = "✅ Enlace enviado. Revisa tu correo.";
+    okEl.classList.remove('hidden');
+  }
+});
+
+// Guardar nueva contraseña
+formNuevaPassword.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const nueva = document.getElementById('nueva-password').value;
+  const confirmar = document.getElementById('confirmar-nueva-password').value;
+  const errorEl = document.getElementById('nueva-password-error');
+  const okEl = document.getElementById('nueva-password-ok');
+  errorEl.classList.add('hidden');
+  okEl.classList.add('hidden');
+
+  if (nueva !== confirmar) {
+    errorEl.textContent = "Las contraseñas no coinciden.";
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  const { error } = await supa.auth.updateUser({ password: nueva });
+
+  if (error) {
+    errorEl.textContent = "Error: " + error.message;
+    errorEl.classList.remove('hidden');
+  } else {
+    okEl.textContent = "✅ Contraseña actualizada. Ya puedes iniciar sesión.";
+    okEl.classList.remove('hidden');
+    formNuevaPassword.reset();
+    // Después de 2s mostrar login
+    setTimeout(() => {
+      formNuevaPassword.classList.add('hidden');
+      formLogin.classList.remove('hidden');
+      document.querySelector('#pantalla-auth .flex.bg-slate-800').classList.remove('hidden');
+    }, 2000);
+  }
+});
+
 // =========================================================================
 // 6. REGISTRO DE CUENTA NUEVA (Empresa + Usuario)
 // =========================================================================
@@ -279,11 +369,32 @@ btnLogout.addEventListener('click', async () => {
 // 10. VERIFICAR SESIÓN AL CARGAR LA PÁGINA
 // =========================================================================
 async function verificarSesionExistente() {
+  // Detectar si viene de un enlace de recuperación de contraseña
+  const hash = window.location.hash;
+  if (hash && hash.includes('type=recovery')) {
+    // Mostrar formulario de nueva contraseña
+    formLogin.classList.add('hidden');
+    formRegistro.classList.add('hidden');
+    document.querySelector('#pantalla-auth .flex.bg-slate-800').classList.add('hidden');
+    document.getElementById('form-nueva-password').classList.remove('hidden');
+    return;
+  }
+
   const { data: { session } } = await supa.auth.getSession();
   if (session && session.user) {
     await cargarSesionUsuario(session.user);
   }
 }
+
+// Escuchar cambios de auth (para capturar el token de recovery)
+supa.auth.onAuthStateChange((event, session) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    formLogin.classList.add('hidden');
+    formRegistro.classList.add('hidden');
+    document.querySelector('#pantalla-auth .flex.bg-slate-800').classList.add('hidden');
+    document.getElementById('form-nueva-password').classList.remove('hidden');
+  }
+});
 
 // =========================================================================
 // 11. NAVEGACIÓN ENTRE VISTAS
