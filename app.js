@@ -301,7 +301,12 @@ btnNavReportes.addEventListener('click', () => {
 // 11b. FECHA DE TRABAJO
 // =========================================================================
 function inicializarFechaTrabajo() {
-  const hoy = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  // Usar fecha local (Bogotá) en vez de UTC
+  const ahora = new Date();
+  const year = ahora.getFullYear();
+  const month = String(ahora.getMonth() + 1).padStart(2, '0');
+  const day = String(ahora.getDate()).padStart(2, '0');
+  const hoy = `${year}-${month}-${day}`;
   inputFechaTrabajo.value = hoy;
   actualizarLabelFecha();
 }
