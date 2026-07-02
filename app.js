@@ -225,6 +225,15 @@ async function cargarSesionUsuario(user) {
     return;
   }
 
+  // Si cambió de empresa, limpiar datos locales
+  const empresaAnterior = localStorage.getItem('sicrem_empresa_actual');
+  if (empresaAnterior && empresaAnterior !== datosUsuario.id_empresa) {
+    await db.equipos.clear();
+    await db.minerales.clear();
+    await db.viajes_pendientes.clear();
+  }
+  localStorage.setItem('sicrem_empresa_actual', datosUsuario.id_empresa);
+
   SESION.user = user;
   SESION.id_empresa = datosUsuario.id_empresa;
   SESION.id_usuario = datosUsuario.id;
@@ -253,6 +262,11 @@ async function cargarSesionUsuario(user) {
 // =========================================================================
 btnLogout.addEventListener('click', async () => {
   await supa.auth.signOut();
+  // Limpiar datos locales al cerrar sesión
+  await db.equipos.clear();
+  await db.minerales.clear();
+  await db.viajes_pendientes.clear();
+  localStorage.removeItem('sicrem_empresa_actual');
   SESION = { user: null, id_empresa: null, id_usuario: null, nombre: '' };
   pantallaApp.classList.add('hidden');
   pantallaAuth.classList.remove('hidden');
