@@ -184,6 +184,9 @@
                 class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold p-3 rounded-lg transition shadow-lg flex justify-center items-center gap-2">
                 Guardar Registro
               </button>
+              <button type="button" id="btn-cancelar-viaje" onclick="resetearFormViaje()" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold p-2.5 rounded-lg transition text-sm hidden">
+                Cancelar
+              </button>
             </form>
           </div>
 
@@ -239,6 +242,9 @@
                 class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold p-2 rounded-lg transition">
                 Guardar Equipo
               </button>
+              <button type="button" id="btn-cancelar-equipo" onclick="resetearFormEquipo()" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-bold p-2 rounded-lg transition hidden">
+                Cancelar
+              </button>
             </form>
             <!-- Lista de equipos existentes -->
             <div class="border-t border-slate-700 pt-3 mt-3">
@@ -282,6 +288,9 @@
               <button type="submit"
                 class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold p-2 rounded-lg transition">
                 Guardar Mineral
+              </button>
+              <button type="button" id="btn-cancelar-mineral" onclick="resetearFormMineral()" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-bold p-2 rounded-lg transition hidden">
+                Cancelar
               </button>
             </form>
             <!-- Lista de minerales existentes -->

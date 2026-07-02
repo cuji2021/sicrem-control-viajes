@@ -577,6 +577,7 @@ async function editarEquipo(id) {
   const btnSubmit = formEquipo.querySelector('button[type="submit"]');
   btnSubmit.textContent = "Actualizar Equipo";
   btnSubmit.className = "w-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold p-2 rounded-lg transition";
+  document.getElementById('btn-cancelar-equipo').classList.remove('hidden');
 
   // Scroll al formulario
   formEquipo.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -604,6 +605,7 @@ async function editarMineral(id) {
   const btnSubmit = formMineral.querySelector('button[type="submit"]');
   btnSubmit.textContent = "Actualizar Mineral";
   btnSubmit.className = "w-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold p-2 rounded-lg transition";
+  document.getElementById('btn-cancelar-mineral').classList.remove('hidden');
 
   // Scroll al formulario
   formMineral.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -615,6 +617,7 @@ function resetearFormEquipo() {
   const btnSubmit = formEquipo.querySelector('button[type="submit"]');
   btnSubmit.textContent = "Guardar Equipo";
   btnSubmit.className = "w-full bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold p-2 rounded-lg transition";
+  document.getElementById('btn-cancelar-equipo').classList.add('hidden');
 }
 
 function resetearFormMineral() {
@@ -624,6 +627,7 @@ function resetearFormMineral() {
   const btnSubmit = formMineral.querySelector('button[type="submit"]');
   btnSubmit.textContent = "Guardar Mineral";
   btnSubmit.className = "w-full bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold p-2 rounded-lg transition";
+  document.getElementById('btn-cancelar-mineral').classList.add('hidden');
 }
 
 // Eliminar (desactivar) equipo
@@ -769,6 +773,7 @@ async function editarViaje(idLocal) {
   const btnSubmit = formulario.querySelector('button[type="submit"]');
   btnSubmit.innerHTML = "Actualizar Registro";
   btnSubmit.className = "w-full bg-amber-600 hover:bg-amber-500 text-white font-bold p-3 rounded-lg transition shadow-lg flex justify-center items-center gap-2";
+  document.getElementById('btn-cancelar-viaje').classList.remove('hidden');
 
   // Scroll al formulario
   formulario.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -783,6 +788,7 @@ function resetearFormViaje() {
   const btnSubmit = formulario.querySelector('button[type="submit"]');
   btnSubmit.innerHTML = "Guardar Registro";
   btnSubmit.className = "w-full bg-blue-600 hover:bg-blue-500 text-white font-bold p-3 rounded-lg transition shadow-lg flex justify-center items-center gap-2";
+  document.getElementById('btn-cancelar-viaje').classList.add('hidden');
 }
 
 // Editar un viaje que ya está en Supabase (no en IndexedDB local)
@@ -821,6 +827,7 @@ async function editarViajeRemoto(idSupabase) {
   const btnSubmit = formulario.querySelector('button[type="submit"]');
   btnSubmit.innerHTML = "Actualizar Registro";
   btnSubmit.className = "w-full bg-amber-600 hover:bg-amber-500 text-white font-bold p-3 rounded-lg transition shadow-lg flex justify-center items-center gap-2";
+  document.getElementById('btn-cancelar-viaje').classList.remove('hidden');
 
   formulario.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
