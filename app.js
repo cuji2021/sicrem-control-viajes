@@ -911,14 +911,18 @@ async function cargarViajesDelDia() {
   // 1. Traer viajes de Supabase para esta fecha (si hay conexión)
   if (navigator.onLine && SESION.id_empresa) {
     try {
-      const inicioFecha = `${fechaTrabajo}T00:00:00`;
-      const finFecha = `${fechaTrabajo}T23:59:59`;
-      const { data: viajesRemoto } = await supa.from('registro_viajes')
+      // Construir rango en la zona horaria local del usuario
+      const inicioLocal = new Date(fechaTrabajo + 'T00:00:00');
+      const finLocal = new Date(fechaTrabajo + 'T23:59:59');
+      
+      const { data: viajesRemoto, error: errViajes } = await supa.from('registro_viajes')
         .select('*')
         .eq('id_empresa', SESION.id_empresa)
-        .gte('fecha_viaje', inicioFecha)
-        .lte('fecha_viaje', finFecha)
+        .gte('fecha_viaje', inicioLocal.toISOString())
+        .lte('fecha_viaje', finLocal.toISOString())
         .order('fecha_viaje', { ascending: true });
+
+      if (errViajes) console.warn("Error consultando viajes:", errViajes);
 
       if (viajesRemoto && viajesRemoto.length > 0) {
         viajesDelDia = viajesRemoto.map(v => ({
