@@ -1069,13 +1069,34 @@ async function exportarExcel() {
     return;
   }
 
-  // Obtener viajes del rango (desde local)
-  const todosViajes = await db.viajes_pendientes.toArray();
-  const viajesFiltrados = todosViajes.filter(v => {
-    if (!v.fecha_viaje) return false;
-    const fechaViaje = new Intl.DateTimeFormat('en-CA', { timeZone: ZONA_HORARIA }).format(new Date(v.fecha_viaje));
-    return fechaViaje >= desde && fechaViaje <= hasta;
-  });
+  let viajesFiltrados = [];
+
+  // Traer viajes de Supabase por rango de fechas (Bogotá UTC-5)
+  if (navigator.onLine && SESION.id_empresa) {
+    const inicioDia = `${desde}T00:00:00-05:00`;
+    const finDia = `${hasta}T23:59:59-05:00`;
+
+    const { data, error } = await supa.from('registro_viajes')
+      .select('*')
+      .eq('id_empresa', SESION.id_empresa)
+      .gte('fecha_viaje', inicioDia)
+      .lte('fecha_viaje', finDia)
+      .order('fecha_viaje', { ascending: true });
+
+    if (error) {
+      mostrarAlerta("Error al consultar viajes: " + error.message, "error");
+      return;
+    }
+    if (data) viajesFiltrados = data;
+  } else {
+    // Sin conexión: usar datos locales
+    const todosViajes = await db.viajes_pendientes.toArray();
+    viajesFiltrados = todosViajes.filter(v => {
+      if (!v.fecha_viaje) return false;
+      const fechaViaje = new Intl.DateTimeFormat('en-CA', { timeZone: ZONA_HORARIA }).format(new Date(v.fecha_viaje));
+      return fechaViaje >= desde && fechaViaje <= hasta;
+    });
+  }
 
   if (viajesFiltrados.length === 0) {
     mostrarAlerta("No hay viajes en el rango de fechas seleccionado.", "warning");
@@ -1093,10 +1114,12 @@ async function exportarExcel() {
     const equipo = mapEquipos[v.id_equipo];
     const mineral = mapMinerales[v.id_mineral];
     const fecha = v.fecha_viaje ? new Date(v.fecha_viaje) : null;
+    const fechaBogota = fecha ? new Intl.DateTimeFormat('es-CO', { timeZone: ZONA_HORARIA, day: '2-digit', month: '2-digit', year: 'numeric' }).format(fecha) : '';
+    const horaBogota = fecha ? new Intl.DateTimeFormat('es-CO', { timeZone: ZONA_HORARIA, hour: '2-digit', minute: '2-digit', hour12: false }).format(fecha) : '';
 
     return {
-      'Fecha': fecha ? fecha.toLocaleDateString('es') : '',
-      'Hora': fecha ? fecha.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) : '',
+      'Fecha': fechaBogota,
+      'Hora': horaBogota,
       'Equipo': equipo?.nombre_equipo || '',
       'Placa/Código': equipo?.placa_interno || '',
       'Material': mineral?.nombre_mineral || '',
@@ -1108,8 +1131,7 @@ async function exportarExcel() {
       'Vol. Arena (m³)': v.volumen_subcomponente_neto || 0,
       'Densidad (Ton/m³)': v.densidad_usada || 0,
       'Toneladas Est.': v.toneladas_estimadas || 0,
-      'Observaciones': v.observaciones || '',
-      'Sincronizado': v.sincronizado ? 'Sí' : 'No'
+      'Observaciones': v.observaciones || ''
     };
   });
 
@@ -1123,7 +1145,7 @@ async function exportarExcel() {
     { wch: 12 }, { wch: 6 }, { wch: 20 }, { wch: 12 },
     { wch: 15 }, { wch: 8 }, { wch: 12 }, { wch: 12 },
     { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 14 },
-    { wch: 12 }, { wch: 20 }, { wch: 10 }
+    { wch: 12 }, { wch: 20 }
   ];
 
   // Descargar
