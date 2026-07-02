@@ -298,16 +298,24 @@ btnNavReportes.addEventListener('click', () => {
 });
 
 // =========================================================================
-// 11b. FECHA DE TRABAJO
+// 11b. FECHA DE TRABAJO (Zona horaria: Bogotá UTC-5)
 // =========================================================================
+const ZONA_HORARIA = 'America/Bogota';
+
+function fechaHoyBogota() {
+  // Obtener la fecha actual en Bogotá
+  const opciones = { timeZone: ZONA_HORARIA, year: 'numeric', month: '2-digit', day: '2-digit' };
+  const partes = new Intl.DateTimeFormat('en-CA', opciones).format(new Date()); // en-CA da formato YYYY-MM-DD
+  return partes; // "2026-07-01"
+}
+
+function horaActualBogota() {
+  const opciones = { timeZone: ZONA_HORARIA, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+  return new Intl.DateTimeFormat('en-GB', opciones).format(new Date()); // "16:30:45"
+}
+
 function inicializarFechaTrabajo() {
-  // Usar fecha local (Bogotá) en vez de UTC
-  const ahora = new Date();
-  const year = ahora.getFullYear();
-  const month = String(ahora.getMonth() + 1).padStart(2, '0');
-  const day = String(ahora.getDate()).padStart(2, '0');
-  const hoy = `${year}-${month}-${day}`;
-  inputFechaTrabajo.value = hoy;
+  inputFechaTrabajo.value = fechaHoyBogota();
   actualizarLabelFecha();
 }
 
@@ -321,11 +329,10 @@ function actualizarLabelFecha() {
 // El listener de cambio de fecha está en la sección 17 (lista de viajes del día)
 
 function obtenerFechaViaje() {
-  // Combina la fecha de trabajo con la hora actual
+  // Guardar siempre con offset de Bogotá (-05:00)
   const fecha = inputFechaTrabajo.value; // YYYY-MM-DD
-  const ahora = new Date();
-  const hora = ahora.toTimeString().split(' ')[0]; // HH:MM:SS
-  return new Date(`${fecha}T${hora}`).toISOString();
+  const hora = horaActualBogota(); // HH:MM:SS
+  return `${fecha}T${hora}-05:00`;
 }
 
 // =========================================================================
@@ -916,15 +923,15 @@ async function cargarViajesDelDia() {
   // 1. Traer viajes de Supabase para esta fecha (si hay conexión)
   if (navigator.onLine && SESION.id_empresa) {
     try {
-      // Construir rango en la zona horaria local del usuario
-      const inicioLocal = new Date(fechaTrabajo + 'T00:00:00');
-      const finLocal = new Date(fechaTrabajo + 'T23:59:59');
+      // Rango del día en zona horaria de Bogotá (UTC-5)
+      const inicioDia = `${fechaTrabajo}T00:00:00-05:00`;
+      const finDia = `${fechaTrabajo}T23:59:59-05:00`;
       
       const { data: viajesRemoto, error: errViajes } = await supa.from('registro_viajes')
         .select('*')
         .eq('id_empresa', SESION.id_empresa)
-        .gte('fecha_viaje', inicioLocal.toISOString())
-        .lte('fecha_viaje', finLocal.toISOString())
+        .gte('fecha_viaje', inicioDia)
+        .lte('fecha_viaje', finDia)
         .order('fecha_viaje', { ascending: true });
 
       if (errViajes) console.warn("Error consultando viajes:", errViajes);
