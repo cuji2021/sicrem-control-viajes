@@ -114,6 +114,19 @@ document.getElementById('btn-ver-password').addEventListener('click', () => {
   }
 });
 
+// Toggle ver/ocultar contraseña en login
+document.getElementById('btn-ver-password-login').addEventListener('click', () => {
+  const input = document.getElementById('login-password');
+  const btn = document.getElementById('btn-ver-password-login');
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁️';
+  }
+});
+
 // =========================================================================
 // 6. REGISTRO DE CUENTA NUEVA (Empresa + Usuario)
 // =========================================================================
