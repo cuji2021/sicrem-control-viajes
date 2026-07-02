@@ -782,6 +782,14 @@ formulario.addEventListener('submit', async (e) => {
     sincronizado: 0
   };
 
+  // Si es edición, conservar la fecha original del viaje
+  if (editandoViajeId) {
+    const viajeOriginal = await db.viajes_pendientes.get(editandoViajeId);
+    if (viajeOriginal && viajeOriginal.fecha_viaje) {
+      datosViaje.fecha_viaje = viajeOriginal.fecha_viaje;
+    }
+  }
+
   try {
     if (editandoViajeId) {
       // MODO EDICIÓN
