@@ -16,10 +16,10 @@ const supa = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // =========================================================================
 const db = new Dexie("SicremLocalDB");
 
-db.version(3).stores({
+db.version(4).stores({
   equipos: 'id, nombre_equipo, capacidad_nominal',
   minerales: 'id, nombre_mineral, tiene_subcomponente, densidad, porcentaje_subcomponente_defecto',
-  viajes_pendientes: '++id_local, id_equipo, id_mineral, volumen_total, sincronizado'
+  viajes_pendientes: '++id_local, id_equipo, id_mineral, volumen_total, sincronizado, id_supabase'
 });
 
 // =========================================================================
@@ -404,6 +404,9 @@ async function cargarCatalogosDesdeBD() {
         await db.minerales.clear();
         await db.minerales.bulkAdd(bdminerales);
       }
+
+      // Descargar viajes recientes (últimos 30 días) para disponibilidad offline
+      await sincronizarViajesDesdeSupabase();
     }
   } catch (err) {
     console.warn("Usando almacenamiento local offline para catálogos.", err);
@@ -422,6 +425,60 @@ async function cargarCatalogosDesdeBD() {
     selectMineral.innerHTML += `<option value="${min.id}" data-subcomponente="${min.tiene_subcomponente}" data-porcentaje-defecto="${min.porcentaje_subcomponente_defecto || 0}">${min.nombre_mineral}</option>`;
   });
   renderizarListaMinerales(listaMinerales);
+}
+
+// =========================================================================
+// 13b. DESCARGA DE VIAJES DESDE SUPABASE → LOCAL (para offline)
+// =========================================================================
+async function sincronizarViajesDesdeSupabase() {
+  try {
+    // Descargar viajes de los últimos 30 días
+    const hace30dias = new Date();
+    hace30dias.setDate(hace30dias.getDate() - 30);
+    const fechaDesde = new Intl.DateTimeFormat('en-CA', { timeZone: ZONA_HORARIA }).format(hace30dias);
+
+    const { data: viajesRemoto } = await supa.from('registro_viajes')
+      .select('*')
+      .eq('id_empresa', SESION.id_empresa)
+      .gte('fecha_viaje', `${fechaDesde}T00:00:00-05:00`)
+      .order('fecha_viaje', { ascending: true });
+
+    if (viajesRemoto && viajesRemoto.length > 0) {
+      // Obtener los que ya tenemos localmente (por id_supabase)
+      const locales = await db.viajes_pendientes.toArray();
+      const idsLocales = new Set(locales.map(v => v.id_supabase).filter(Boolean));
+
+      // Solo agregar los que no existan localmente
+      const nuevos = viajesRemoto
+        .filter(v => !idsLocales.has(v.id))
+        .map(v => ({
+          ...v,
+          id_supabase: v.id,
+          sincronizado: 1
+        }));
+
+      if (nuevos.length > 0) {
+        // Eliminar el campo 'id' (uuid de Supabase) para que Dexie use su autoincrement
+        for (const viaje of nuevos) {
+          delete viaje.id;
+          await db.viajes_pendientes.add(viaje);
+        }
+      }
+
+      // También actualizar los que ya existen (por si se editaron remotamente)
+      for (const viajeRemoto of viajesRemoto) {
+        const local = locales.find(l => l.id_supabase === viajeRemoto.id);
+        if (local) {
+          const { id, ...datosActualizar } = viajeRemoto;
+          datosActualizar.id_supabase = id;
+          datosActualizar.sincronizado = 1;
+          await db.viajes_pendientes.update(local.id_local, datosActualizar);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Error descargando viajes desde Supabase:", err);
+  }
 }
 
 // =========================================================================
@@ -714,31 +771,27 @@ formulario.addEventListener('submit', async (e) => {
 
   try {
     if (editandoViajeId) {
-      // MODO EDICIÓN LOCAL
+      // MODO EDICIÓN
       const viajeExistente = await db.viajes_pendientes.get(editandoViajeId);
       
-      if (viajeExistente && viajeExistente.sincronizado && viajeExistente.id_supabase) {
+      if (viajeExistente && viajeExistente.id_supabase) {
+        // Tiene id en Supabase → actualizar allá también
         datosViaje.sincronizado = 1;
-        const { id_empresa, id_usuario, sincronizado, ...datosUpdate } = datosViaje;
-        const { error } = await supa.from('registro_viajes').update(datosUpdate).eq('id', viajeExistente.id_supabase);
-        if (error) {
-          datosViaje.sincronizado = 0;
+        datosViaje.id_supabase = viajeExistente.id_supabase;
+        if (navigator.onLine) {
+          const { id_empresa, id_usuario, sincronizado, id_supabase, id_local, ...datosUpdate } = datosViaje;
+          const { error } = await supa.from('registro_viajes').update(datosUpdate).eq('id', viajeExistente.id_supabase);
+          if (error) {
+            datosViaje.sincronizado = 0; // Si falla, quedará pendiente
+          }
+        } else {
+          datosViaje.sincronizado = 0; // Offline, se sincronizará después
         }
       } else {
         datosViaje.sincronizado = 0;
       }
 
       await db.viajes_pendientes.update(editandoViajeId, datosViaje);
-      mostrarAlerta("Registro actualizado correctamente.", "success");
-      resetearFormViaje();
-    } else if (editandoViajeRemotoId) {
-      // MODO EDICIÓN REMOTA (viaje que vino de Supabase)
-      const { id_empresa, id_usuario, sincronizado, ...datosUpdate } = datosViaje;
-      const { error } = await supa.from('registro_viajes').update(datosUpdate).eq('id', editandoViajeRemotoId);
-      if (error) {
-        mostrarAlerta("Error al actualizar: " + error.message, "error");
-        return;
-      }
       mostrarAlerta("Registro actualizado correctamente.", "success");
       resetearFormViaje();
     } else {
@@ -920,45 +973,13 @@ async function cargarViajesDelDia() {
 
   let viajesDelDia = [];
 
-  // 1. Traer viajes de Supabase para esta fecha (si hay conexión)
-  if (navigator.onLine && SESION.id_empresa) {
-    try {
-      // Rango del día en zona horaria de Bogotá (UTC-5)
-      const inicioDia = `${fechaTrabajo}T00:00:00-05:00`;
-      const finDia = `${fechaTrabajo}T23:59:59-05:00`;
-      
-      const { data: viajesRemoto, error: errViajes } = await supa.from('registro_viajes')
-        .select('*')
-        .eq('id_empresa', SESION.id_empresa)
-        .gte('fecha_viaje', inicioDia)
-        .lte('fecha_viaje', finDia)
-        .order('fecha_viaje', { ascending: true });
-
-      if (errViajes) console.warn("Error consultando viajes:", errViajes);
-
-      if (viajesRemoto && viajesRemoto.length > 0) {
-        viajesDelDia = viajesRemoto.map(v => ({
-          ...v,
-          id_local: null,
-          id_supabase: v.id,
-          sincronizado: 1
-        }));
-      }
-    } catch (err) {
-      console.warn("No se pudieron cargar viajes remotos:", err);
-    }
-  }
-
-  // 2. Agregar viajes locales pendientes (no sincronizados) de esta fecha
-  const viajesLocales = await db.viajes_pendientes.toArray();
-  const pendientesDelDia = viajesLocales.filter(v => {
-    if (!v.fecha_viaje || v.sincronizado) return false;
-    // Convertir la fecha guardada a fecha en Bogotá para comparar
+  // Leer todos los viajes de IndexedDB (ya contiene los descargados de Supabase + los pendientes)
+  const todosLocales = await db.viajes_pendientes.toArray();
+  viajesDelDia = todosLocales.filter(v => {
+    if (!v.fecha_viaje) return false;
     const fechaEnBogota = new Intl.DateTimeFormat('en-CA', { timeZone: ZONA_HORARIA }).format(new Date(v.fecha_viaje));
     return fechaEnBogota === fechaTrabajo;
   });
-
-  viajesDelDia = [...viajesDelDia, ...pendientesDelDia];
 
   // Ordenar por fecha
   viajesDelDia.sort((a, b) => new Date(a.fecha_viaje) - new Date(b.fecha_viaje));
@@ -997,12 +1018,9 @@ async function cargarViajesDelDia() {
               <span class="text-xs text-amber-400">Arena: ${v.volumen_subcomponente_neto} m³ (${porcentajeSub}%)</span>
             </div>` : '';
 
-    // Todos editables
-    const esLocal = v.id_local != null;
+    // Todos editables - tienen id_local porque están en IndexedDB
     const claseClick = 'cursor-pointer hover:border-blue-500/50';
-    const onClickViaje = esLocal 
-      ? `onclick="editarViaje(${v.id_local})"` 
-      : `onclick="editarViajeRemoto('${v.id_supabase}')"`;
+    const onClickViaje = `onclick="editarViaje(${v.id_local})"`;
     const iconoEditar = '<span class="text-blue-400 text-xs">✏️</span>';
 
     return `
